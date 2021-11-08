@@ -1,0 +1,213 @@
+---
+title: "Tarea3_ts"
+author: "Arath Reyes"
+date: "7/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dygraphs)
+library(imputeTS)
+library(tseries)
+library(TSA)
+library(nortest)
+library(forecast)
+library(ggplot2)
+library(lmtest)
+```
+
+# **Tarea 3:** Modelación ARIMA 
+
+```{r}
+library(tsdl)
+ts_12 <- tsdl[[12]]
+attributes(ts_12)
+```
+## **Inciso 1:**
+Veamos cuáles y cómo son los datos presentados:
+```{r}
+print(ts_12)
+plot(ts_12, main = "Quarterly U.S. new plant/equip. expenditures \n 64 76 billions", col = "red")
+tsdisplay(ts_12, main= "Quarterly U.S. new plant/equip. expenditures \n 64 76 billions", col = "red")
+```
+ 
+Después de aplicar la función *descompose*, obtuvimos lo siguiente:
+ 
+```{r, align='center', fig.cap= "Figura 1: Serie de Tiempo Descompuesta", fig.height=8, fig.width=12}
+# Aplicar decompose
+dec_data <- decompose(ts_12)
+plot(dec_data) 
+```
+ 
+Después de haber imputado datos a la parte relacionada con la tendencia y a la parte aleatoria, obtuvimos el siguiente gráfico, combinando los datos originales, la tendencia y la periodicidad: 
+
+```{r, fig.cap="Figura 2: Datos Originales, Periodicidad y Tendencia", fig.align='center', fig.height=8, fig.width=12}
+
+# Plot de datos originales, tendencia y periodicidad
+Tendencia = dec_data$trend
+Datos = dec_data$x
+Periodicidad = dec_data$seasonal
+
+myVector <- cbind(Datos,Tendencia, Periodicidad)
+
+dygraph(myVector, main = "Data")%>%
+  dySeries("Tendencia", drawPoints =  TRUE, color = 'red')
+
+```
+
+A primer vistazo, podemos notar que nuestra serie de tiempo dada por los datos de "Quarterly U.S. new plant/equip. expenditure 64 76 billions" tiene **varianza creciente**, una **tendencia creciente**, así como la **existencia clara de ciclos estacionales.**  Debemos ser minucioso respecto a la última afirmación, pues no es clara, a nuestro parecer, la periodicidad de nuestra serie de tiempo; superficialmente podríamos afirmar que esta periodicidad de 12, 6 o 3 meses.
+
+No obstante, este análisis visual es insuficiente para consolidar nuestras afirmaciones, por ello, procedemos a hacer un análisis estadístico de los mismos.
+
+### Varianza:
+
+Confirmemos nuestra afirmación de que este proceso es **heterocedástico** aplicando una prueba de Breusch-Pagan para homocedasticidad, es decir:
+$$\textbf{Test de Breusch-Pagan}$$
+$$H_0:\sigma^2 \text{ constante} \quad \text{vs}\quad H_a: \sigma^2\text{ no constante}$$
+Por medio del siguiente código:
+
+```{r}
+# Observamos las fecha de inicio y final en nuestros datos
+print(start(ts_12))
+print(end(ts_12))
+# Creamos una secuencia con los datos mostrados cada 1/4 (Dado que los datos son trimestrales)
+t = seq(1964, 1976+ 3/4, by = 1/4)
+bptest(ts_12 ~ t)
+```
+Podemos observar que el $p$-value es *0.02047*, de esta manera rechazamos $H_{0}$, es decir, tenemos un proceso heterocedástico, lo que significa que nuestro proceso no tiene varianza constante, lo cual confirma nuestra afirmación obtenida por medio del análisis visual.
+
+### Tendencia
+
+Como podemos observar en los gráficos anteriormente mostrados, esta series de tiempo tiene una tendencia creciente, esto se hace explícto al observar la **figura 1**, en la cual la tendencia se muestra como una curva creciente, y esto se confirma al observar la **figura 2**, en la cual la tendencia *(mostrada en color rojo)* se observa como una curva creciente que acompaña a los datos originales.
+
+### Ciclos Estacionales
+
+Observemos primero el ACF y PACF para rescatar información acerca de los ciclos estacionales:
+```{r, fig.align='center', fig.height=6, fig.width=6}
+par(mfrow = c(2,1))
+acf(ts_12)
+pacf(ts_12)
+```
+
+Visualmente, parece claro que los ciclos estacionales sean de 2 periodos o, equivalentemente, de 6 meses o, 4 periodos o 12 meses. Aún más, viendo el PACF observamos para el 2no punto este se muestra altamente correlacionado, así como el 4to. A pesar de esta evidencia consideremos lo siguiente:
+
+
+```{r}
+p = periodogram(ts_12, main = "Periodograma", col = 4)
+# Ordenamos de mayor a menor las estimaciones del periodograma
+spec = sort(p$spec, decreasing = TRUE)
+spec = spec[1:5]
+i = match(spec, p$spec) # Buscamos sus índices en el periodograma
+d = p$freq
+d = d[i]
+cbind(spec, d, i)
+d = 1/d
+d = floor(d)
+d = sort(d)
+d #Posibles periodos
+```
+Dado lo anterior, podemos afirmar que **nuestra serie tiene un ciclo de 2 periodos o de 6 meses.**
+
+
+Al observar el ACF nos podemos percatar que existen correlaciones anteriores, de esta manera, es tentador afirmar que nuestra serie **NO es estacionaria**, de nuevo, esta interpretación del ACF debe ser corroborada de forma estadística.
+
+### Estacionariedad
+
+Anteriormente afirmamos que nuestra serie de tiempo es no estacionaria, para confirmar dicha premisa aplicaremos dos pruebas de hipótesis para estacionariedad.
+$$\textbf{Test de Dickey-Fuller}$$
+$$H_0: \text{NO Estacionariedad} \quad \text{vs}\quad H_a:\text{Estacionariedad}$$
+ 
+```{r}
+adf.test(ts_12)
+```
+
+$$\textbf{Test de  Kwiatkowski-Phillips-Schmidt-Shin}$$
+$$H_0: \text{Estacionariedad} \quad \text{vs}\quad H_a:\text{NO Estacionariedad}$$
+```{r}
+kpss.test(ts_12)
+```
+
+Podemos notar que para el test DF fallamos en rechazar la hipótesis nula y para el test KPSS rechazamos la hipótesis nula, lo que en ambos casos nos permite confirmar nuestra hipótesis sobre la no estacionariedad de la serie. 
+
+Busquemos ahora la manera en que, al tranformar la serie, esta se vuelva estacionaria. Consideremos las lambdas de BoxCox por los métodos Guerrero y Loglik.
+
+```{r}
+print(paste0("Lambda con método guerrero: ",BoxCox.lambda(ts_12, method = "guerrero")))
+print(paste0("Lambda con método loglik: ", BoxCox.lambda(ts_12, method = "loglik")))
+```
+
+Dadas las $\lambda$'s obtenidas, tenemos 4 primeras opciones para proceder, las primeras dos consisten en tomar las transformaciones BoxCox asociadas a dichas $\lambda$'s; mientras que las siguientes dos opciones, consisten en considerar las transformaciones usuales sugeridas en nuestras notas, es decir, aplicar la función $\sqrt{X_{t}}$ o la función $\ln(X_{t})$ a nuestros datos. En cualquiera de los casos, después de aplicar la transformación deseada es necesario validar que esta sea homocedastica y estacionaria, sino, es necesario aplicar más transformaciones o regresar a la serie original y decantarse por otra transformación. *Después de muchos intentos consideramos la siguiente transformación de los datos.*
+
+```{r}
+data = sqrt(ts_12)
+data = diff(diff(data))
+data
+```
+
+Podemos notar que perdimos dos registros, sin embargo, no es de gran problema pues, en comparación con la cantidad original de registros, no es una pérdida significativa.
+
+Ahora, veamos si nuestra serie transformada es homocedástica y estacionaria.
+```{r}
+bptest(data~t[3:52])
+adf.test(data)
+kpss.test(data)
+```
+
+Efectivamente, nuestra nueva series es **homocedástica y es estacionaria**. *De aquí en adelante, modelaremos nuestra serie con estos datos transformados.* Veamos los nuevos datos:
+```{r}
+ts.plot(data, main ="Datos Transformados" ,col = "red", lwd = 2)
+acf(data)
+pacf(data)
+```
+
+
+## **Inciso 2**
+Veamos que los datos a eliminar son los siguientes:
+```{r}
+datos_eliminados <- c(ts_12[29], ts_12[38], ts_12[39])
+datos_eliminados
+```
+Entonces eliminemos dichos datos:
+```{r}
+ts_12[29] = NA
+ts_12[38] = NA
+ts_12[39] = NA
+ts_12
+```
+Imputemos ahora datos nuevos:
+```{r}
+ts_12_1 = na_interpolation(ts_12)
+ts_12_1
+```
+
+
+```{r}
+ts_12_2 = na_kalman(ts_12)
+ts_12_2
+```
+Ahora consideremos los datos reemplazados:
+```{r}
+datos_nuevos1 <- c(ts_12_1[29], ts_12_1[38], ts_12_1[39])
+datos_nuevos2 <- c(ts_12_2[29], ts_12_2[38], ts_12_2[39])
+print(datos_eliminados)
+print(datos_nuevos1)
+print(datos_nuevos2)
+```
+A primera vista parece que los datos imputados por el método del Kalman son más parecidos a los originales que los dados por interpolación, sin embargo, consideremos el *error quadrático medio* de ambas estimaciones y así confirmar nuestra declaración anterior.
+
+```{r}
+MSE1 = (1/3)*mean((datos_eliminados - datos_nuevos1)^2)
+MSE2 = (1/3)*mean((datos_eliminados - datos_nuevos2)^2)
+print(paste0("Error Cuadrático Medio de Estimación por Interpolación: ", MSE1))
+print(paste0("Error Cuadrático Medio de Estimación por Kalman: ", MSE2))
+```
+
+Con lo anterior confirmamos que el método de Kalman fue mejor para estimar nuestros datos eliminados.
+
+## Inciso 3:
+
+
+
+
+
