@@ -432,7 +432,7 @@ tsdiag(fit4_data)
 Notemos que para todos nuestros modelos los $lags$ se encuentra por encima de nuestra $\alpha = 0.05$ por lo que aceptamos la hipótesis nula, es decir si tenemos independencia en todos los modelos.
 Por lo que tenemos:
 
-Table: Resumen de los residuales
+Table: Análisis de los residuales
 
 |          |**Normalidad**|**Varianza constante**|**Media cero**|**Independencia**|
 |----------|--------------|----------------------|--------------|-----------------|
