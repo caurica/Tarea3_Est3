@@ -206,7 +206,240 @@ print(paste0("Error Cuadrático Medio de Estimación por Kalman: ", MSE2))
 Con lo anterior confirmamos que el método de Kalman fue mejor para estimar nuestros datos eliminados.
 
 ## Inciso 3:
+Primero observemos el ACF y PACF para notar cuantos parámetros significantes tenemos:
+```{r}
+tsdisplay(data)
+```
+Observamos algo raro en el ACF pues todas las observaciones se salen de nuestras bandas de confianza, esto debido a que tenemos un proceso estacionario con ciclos estacionales. Además, podemos observar que siguen cierto comportamiento, por lo que propondremos los siguientes modelos:
 
+```{r}
+#Modelo 1
+#SARIMA(1,0,1)(0,1,1)[4]
+fit1_data <- arima(data, c(1, 0, 1), seasonal = list(order = c(0, 1, 1), period = 4))
+#Modelos 2
+#SARIMA(0,0,1)(1,1,1)[4] 
+fit2_data <- arima(data, c(0, 0, 1), seasonal = list(order = c(1, 1, 1), period = 4))
+#Modelo3
+#SARIMA(0,0,1)(0,1,0)[4] 
+fit3_data <- arima(data, c(0, 0, 1), seasonal = list(order = c(0, 1, 0), period = 4))
+```
+
+Ahora usemos la función *auto.arima()* para proponer un cuarto moedelo:
+
+```{r}
+fit4_data <- auto.arima(data)
+summary(fit4_data)
+```
+Observemos que tenemos un modelos *SARIMA* con coeficientes $p=0, P=0, d=0, D=1, q=1$ y $Q=1$. Notemos que la $D=1$ nos inidica cuantas diferencias necesitamos para estabilizar los ciclos estacionales.
+
+Ahora veamos graficamente los datos discrepates que tenemos en cada modelo:
+
+```{r, datos discrepantes}
+par(mfrow=c(2,2))
+#Modelo1
+plot(fit1_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 1", lwd=2)
+abline(h=3*(var(fit1_data$residuals)), col="red", lwd=2)
+abline(h=-3*(var(fit1_data$residuals)), col="red", lwd=2)
+
+#Modelo 2
+plot(fit2_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 2", lwd=2)
+abline(h=3*(var(fit2_data$residuals)), col="red", lwd=2)
+abline(h=-3*(var(fit2_data$residuals)), col="red", lwd=2)
+
+#Modelo 3
+plot(fit3_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 3", lwd=2)
+abline(h=3*(var(fit3_data$residuals)), col="red", lwd=2)
+abline(h=-3*(var(fit3_data$residuals)), col="red", lwd=2)
+
+#Modelo 4
+plot(fit4_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 4", lwd=2)
+abline(h=3*(var(fit4_data$residuals)), col="red", lwd=2)
+abline(h=-3*(var(fit4_data$residuals)), col="red", lwd=2)
+```
+Podemos notar que tenemos una gran cantidad de datos discrepantes, por lo que no podemos garantizar que algun modelo es mejor que otro. Entonces hagamos una comparación de criterios de bondad de ajuste, es decir veamos el AIC, BIC, ME, MAE, RMSE y  el número de parámetros:
+
+```{r}
+comparar_1=cbind("SARIMA(1,0,1)(0,1,1)[4]",fit1_data$aic,BIC(fit1_data), mean(fit1_data$residuals), mean(abs(fit1_data$residuals)), sqrt(mean((fit1_data$residuals)^2)), 4)
+
+comparar_2=cbind("SARIMA(0,0,1)(1,1,1)[4]",fit2_data$aic,BIC(fit2_data), mean(fit2_data$residuals), mean(abs(fit2_data$residuals)), sqrt(mean((fit2_data$residuals)^2)), 4)
+
+comparar_3=cbind("SARIMA(0,0,1)(0,1,0)[4]",fit3_data$aic, BIC(fit3_data), mean(fit3_data$residuals), mean(abs(fit3_data$residuals)), sqrt(mean((fit3_data$residuals)^2)), 4)
+
+comparar_4=cbind("SARIMA(0,0,1)(0,1,1)[4]", fit4_data$aic, BIC(fit4_data), mean(fit4_data$residuals), mean(abs(fit4_data$residuals)), sqrt(mean((fit4_data$residuals)^2)), 4)
+
+nombres=cbind("AJUSTE", "AIC", "BIC","ME","MAE", "RMSE","#Paramatros")
+
+resultados<-rbind(comparar_1,comparar_2,comparar_3, comparar_4)
+resultados<-as.table(resultados)
+colnames(resultados)=c("AJUSTE", "AIC", "BIC","ME","MAE", "RMSE","#Parametros")
+rownames(resultados)=c("", "", "", "")
+
+(resultados)
+```
+Considerando el AIC, notemos que el *modelo 1* se ajusta mejor y tomando en cuenta el BIC tnemos que el *modelo 4* se ajusta mejor. Pero considerando los errores tenemos que el *modelo 1* se ajusta mejor. Ahora verifiquemos los supuestos para elegir el mejor modelo.
+
+## Normalidad
+Primero veamos *qqnorm*:
+```{r}
+par(mfrow=c(2,2))
+#Modelo 1
+qqnorm(fit1_data$residuals, main = "Normal QQ-Plot Modelo 1")
+qqline(fit1_data$residuals, col="red", lwd=2)
+#Modelo 2
+qqnorm(fit2_data$residuals, main = "Normal QQ-Plot Modelo 2")
+qqline(fit2_data$residuals, col="red", lwd=2)
+#Modelo 3
+qqnorm(fit3_data$residuals, main = "Normal QQ-Plot Modelo 3")
+qqline(fit3_data$residuals, col="red", lwd=2)
+#Modelo 4
+qqnorm(fit4_data$residuals, main = "Normal QQ-Plot Modelo 4")
+qqline(fit4_data$residuals, col="red", lwd=2)
+```
+A primera vista, podemos observar que ningun modelo cumple con el supuesto de normalidad, pero para confirmar esto realizaremos algunos test de normalidad.
+
+$$\textbf{Test de  Anderson-Darling}$$
+$$H_0: \text{Los datos siguen una distribución normal} \quad \text{vs}\quad H_a:\text{Los datos no siguen una distribución normal}$$
+```{r}
+#Modelo 1
+ad.test(fit1_data$residuals)
+#Modelo 2
+ad.test(fit2_data$residuals)
+#Modelo 3
+ad.test(fit3_data$residuals)
+#Modelo 4
+ad.test(fit4_data$residuals)
+```
+Notemos que para todos los modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba de Aderson-Darling nos dice que nuestros residuos siguen una distribución normal. 
+
+$$\textbf{Test de  Shapiro-Wilks}$$
+$$H_0: \text{La distribución es normal} \quad \text{vs}\quad H_a:\text{La distribución no es normal}$$
+
+```{r}
+#Modelo 1
+shapiro.test(fit1_data$residuals)
+#Modelo 2
+shapiro.test(fit2_data$residuals)
+#Modelo 3
+shapiro.test(fit3_data$residuals)
+#Modelo 4
+shapiro.test(fit4_data$residuals)
+```
+Para los *modelos 2* y *4* $p-value < \alpha = 0.05$ entonces rechazamos $H_0$, por lo que la prueba de Shapiro-Wilks nos dice que nuestros datos no siguen una distribución normal. Pero para los *modelos 1* y *3* $p-value > \alpha = 0.05$ entonces aceptamos $H_0$, por lo que la prueba de Shapiro-Wilks nos dice que nuestros residuales siguen una distribución normal.
+
+$$\textbf{Test de  Jarque-Bera}$$
+$$H_0: \text{La distribución es normal} \quad \text{vs}\quad H_a:\text{La distribución no es normal}$$
+```{r}
+#Modelo 1
+jarque.bera.test(fit1_data$residuals)
+#Modelo 2
+jarque.bera.test(fit2_data$residuals)
+#Modelo 3
+jarque.bera.test(fit3_data$residuals)
+#Modelo 4
+jarque.bera.test(fit4_data$residuals)
+```
+Notemos que para los *modelos 1, 2* y *4* el $p-value < \alpha = 0.05$ entonces rechazamos $H_0$, por lo que la prueba de Jarque-Bera nos dice que nuestros residuales no siguen una distribución normal. Pero para el *modelo 3* el $p-value > \alpha = 0.05$ entonces aceptamos $H_0$, por lo que la prueba de Jarque-Bera nos dice que nuestros residuales siguen una distribución normal.
+
+El único modelo que paso todas las pruebas de normalidad fue el *3*. Ahora veamos los demás supuestos.
+
+## Varianza constante
+
+Apliquemos las siguientes pruebas:
+
+$$\textbf{Test de Breusch-Pagan}$$
+$$H_0:\sigma^2 \text{ constante} \quad \text{vs}\quad H_a: \sigma^2\text{ no constante}$$
+
+```{r}
+#Modelo 1
+Y1 <- as.numeric(fit1_data$residuals)
+X1 <- 1:length(fit1_data$residuals)
+bptest(Y1 ~ X1)
+#Modelo 2
+Y2 <- as.numeric(fit2_data$residuals)
+X2 <- 1:length(fit2_data$residuals)
+bptest(Y2 ~ X2)
+#Modelo 3
+Y3 <- as.numeric(fit3_data$residuals)
+X3 <- 1:length(fit3_data$residuals)
+bptest(Y3 ~ X3)
+#Modelo 4
+Y4 <- as.numeric(fit4_data$residuals)
+X4 <- 1:length(fit4_data$residuals)
+bptest(Y4 ~ X4)
+```
+Notemos que para todos nuestros modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba de Breusch-Pagan nos dice que nuestros residuales tienen varianza constante.
+
+## Media cero
+
+$$\textbf{Test T-cuadrada de Hotelling}$$
+$$H_0: \text{La media es igual a 0} \quad \text{vs}\quad H_a: \text{ La media no es igual a 0}$$
+```{r}
+#Modelo 1
+t.test(fit1_data$residuals,mu=0)
+#Modelo 2
+t.test(fit2_data$residuals,mu=0)
+#Modelo 3
+t.test(fit3_data$residuals,mu=0)
+#Modelo 4
+t.test(fit4_data$residuals,mu=0)
+```
+Observemos que para todos nuestros modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba T-cuadrada de Hotelling nos dice que tenemos media cero.
+
+## Independencia
+
+Primero veamos graficamente los residuales:
+
+```{r}
+#Modelo 1
+ggtsdisplay(fit1_data$residuals,main="Residuales Modelo 1")
+#Modelo 2
+ggtsdisplay(fit2_data$residuals,main="Residuales Modelo 2")
+#Modelo 3
+ggtsdisplay(fit3_data$residuals,main="Residuales Modelo 3")
+#Modelo 4
+ggtsdisplay(fit4_data$residuals,main="Residuales Modelo 4")
+```
+
+Para el *modelo 1* y *2* notemos que en $lag=4$ ligeramente se sale nuestro dato del intervalo de confianza por lo que aplicaremos la prueba de Box-Pierce en dicho lag. Para el *modelo 3* aplicaremos la misma prueba pero en $lag=8$ y para el *modelo 4* en $lag=5$.
+
+$$\textbf{Test de Box-Pierce}$$
+$$H_0: \text{Independencia} \quad \text{vs}\quad H_a: \text{Dependencia}$$
+```{r}
+#Modelo 1
+Box.test(fit1_data$residuals, lag = 4)
+#Modelo 2
+Box.test(fit2_data$residuals, lag = 4)
+#Modelo 3
+Box.test(fit3_data$residuals, lag = 8)
+#Modelo 4
+Box.test(fit4_data$residuals, lag = 5)
+```
+Notemos que para todos los modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba de Box-Pierce nos dice que tenemos independencia en los residuales de todos nuestros modelos.
+
+Ahora, relicemos la siguiente prueba:
+$$\textbf{Test de Ljung-Box}$$
+$$H_0: \text{Los datos se distribuyen de forma independiente} \quad \text{vs}\quad H_a: \text{Los datos no se distribuyen de forma independiente}$$
+```{r}
+#Modelo 1
+tsdiag(fit1_data)
+#Modelo 2
+tsdiag(fit2_data)
+#Modelo 3
+tsdiag(fit3_data)
+#Modelo 4
+tsdiag(fit4_data)
+```
+Notemos que para todos nuestros modelos los $lags$ se encuentra por encima de nuestra $\alpha = 0.05$ por lo que aceptamos la hipótesis nula, es decir si tenemos independencia en todos los modelos.
+Por lo que tenemos:
+
+Table: Resumen de los residuales
+
+|          |**Normalidad**|**Varianza constante**|**Media cero**|**Independencia**|
+|----------|--------------|----------------------|--------------|-----------------|
+|*Modelo 1*|   $\times$   |      $\checkmark$    | $\checkmark$ |   $\checkmark$  | 
+|*Modelo 2*| $\checkmark$ |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
+|*Modelo 3*|   $\times$   |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
+|*Modelo 4*|   $\times$   |     $\checkmark$     | $\checkmark$ |   $\checkmark$  | 
 
 
 
