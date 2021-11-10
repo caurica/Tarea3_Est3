@@ -219,9 +219,12 @@ fit1_data <- arima(data, c(1, 0, 1), seasonal = list(order = c(0, 1, 1), period 
 #Modelos 2
 #SARIMA(0,0,1)(1,1,1)[4] 
 fit2_data <- arima(data, c(0, 0, 1), seasonal = list(order = c(1, 1, 1), period = 4))
-#Modelo3
+#Modelo 3
 #SARIMA(0,0,1)(0,1,0)[4] 
 fit3_data <- arima(data, c(0, 0, 1), seasonal = list(order = c(0, 1, 0), period = 4))
+#Modelo 5
+#SARIMA(1,0,1)(1,1,1)[4]
+fit5_data  <- arima(data, c(1, 0, 1), seasonal = list(order = c(1, 1, 1), period = 4))
 ```
 
 Ahora usemos la función *auto.arima()* para proponer un cuarto moedelo:
@@ -232,10 +235,9 @@ summary(fit4_data)
 ```
 Observemos que tenemos un modelos *SARIMA* con coeficientes $p=0, P=0, d=0, D=1, q=1$ y $Q=1$. Notemos que la $D=1$ nos inidica cuantas diferencias necesitamos para estabilizar los ciclos estacionales.
 
-Ahora veamos graficamente los datos discrepates que tenemos en cada modelo:
+Ahora veamos graficamente los datos discrepantes que tenemos en cada modelo:
 
 ```{r, datos discrepantes}
-par(mfrow=c(2,2))
 #Modelo1
 plot(fit1_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 1", lwd=2)
 abline(h=3*(var(fit1_data$residuals)), col="red", lwd=2)
@@ -255,6 +257,11 @@ abline(h=-3*(var(fit3_data$residuals)), col="red", lwd=2)
 plot(fit4_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 4", lwd=2)
 abline(h=3*(var(fit4_data$residuals)), col="red", lwd=2)
 abline(h=-3*(var(fit4_data$residuals)), col="red", lwd=2)
+
+#Modelo 5
+plot(fit5_data$residuals, type="p", col="blue", ylab="", xlab="", main="Modelo 5", lwd=2)
+abline(h=3*(var(fit5_data$residuals)), col="red", lwd=2)
+abline(h=-3*(var(fit5_data$residuals)), col="red", lwd=2)
 ```
 Podemos notar que tenemos una gran cantidad de datos discrepantes, por lo que no podemos garantizar que algun modelo es mejor que otro. Entonces hagamos una comparación de criterios de bondad de ajuste, es decir veamos el AIC, BIC, ME, MAE, RMSE y  el número de parámetros:
 
@@ -267,21 +274,22 @@ comparar_3=cbind("SARIMA(0,0,1)(0,1,0)[4]",fit3_data$aic, BIC(fit3_data), mean(f
 
 comparar_4=cbind("SARIMA(0,0,1)(0,1,1)[4]", fit4_data$aic, BIC(fit4_data), mean(fit4_data$residuals), mean(abs(fit4_data$residuals)), sqrt(mean((fit4_data$residuals)^2)), 4)
 
+comparar_5=cbind("SARIMA(1,0,1)(1,1,1)[4]", fit5_data$aic, BIC(fit5_data), mean(fit5_data$residuals), mean(abs(fit5_data$residuals)), sqrt(mean((fit5_data$residuals)^2)), 4)
+
 nombres=cbind("AJUSTE", "AIC", "BIC","ME","MAE", "RMSE","#Paramatros")
 
-resultados<-rbind(comparar_1,comparar_2,comparar_3, comparar_4)
+resultados<-rbind(comparar_1,comparar_2,comparar_3, comparar_4, comparar_5)
 resultados<-as.table(resultados)
 colnames(resultados)=c("AJUSTE", "AIC", "BIC","ME","MAE", "RMSE","#Parametros")
-rownames(resultados)=c("", "", "", "")
+rownames(resultados)=c("", "", "", "", "")
 
 (resultados)
 ```
-Considerando el AIC, notemos que el *modelo 1* se ajusta mejor y tomando en cuenta el BIC tnemos que el *modelo 4* se ajusta mejor. Pero considerando los errores tenemos que el *modelo 1* se ajusta mejor. Ahora verifiquemos los supuestos para elegir el mejor modelo.
+Considerando el AIC, notemos que el *modelo 1* se ajusta mejor y tomando en cuenta el BIC tenemos que el *modelo 4* se ajusta mejor. Pero considerando los errores tenemos que el *modelo 1* se ajusta mejor. Ahora verifiquemos los supuestos para elegir el mejor modelo.
 
 ## Normalidad
 Primero veamos *qqnorm*:
 ```{r}
-par(mfrow=c(2,2))
 #Modelo 1
 qqnorm(fit1_data$residuals, main = "Normal QQ-Plot Modelo 1")
 qqline(fit1_data$residuals, col="red", lwd=2)
@@ -294,6 +302,9 @@ qqline(fit3_data$residuals, col="red", lwd=2)
 #Modelo 4
 qqnorm(fit4_data$residuals, main = "Normal QQ-Plot Modelo 4")
 qqline(fit4_data$residuals, col="red", lwd=2)
+#Modelo 5
+qqnorm(fit5_data$residuals, main = "Normal QQ-Plot Modelo 5")
+qqline(fit5_data$residuals, col="red", lwd=2)
 ```
 A primera vista, podemos observar que ningun modelo cumple con el supuesto de normalidad, pero para confirmar esto realizaremos algunos test de normalidad.
 
@@ -308,6 +319,8 @@ ad.test(fit2_data$residuals)
 ad.test(fit3_data$residuals)
 #Modelo 4
 ad.test(fit4_data$residuals)
+#Modelo 5
+ad.test(fit5_data$residuals)
 ```
 Notemos que para todos los modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba de Aderson-Darling nos dice que nuestros residuos siguen una distribución normal. 
 
@@ -323,8 +336,10 @@ shapiro.test(fit2_data$residuals)
 shapiro.test(fit3_data$residuals)
 #Modelo 4
 shapiro.test(fit4_data$residuals)
+#Modelo 5
+shapiro.test(fit5_data$residuals)
 ```
-Para los *modelos 2* y *4* $p-value < \alpha = 0.05$ entonces rechazamos $H_0$, por lo que la prueba de Shapiro-Wilks nos dice que nuestros datos no siguen una distribución normal. Pero para los *modelos 1* y *3* $p-value > \alpha = 0.05$ entonces aceptamos $H_0$, por lo que la prueba de Shapiro-Wilks nos dice que nuestros residuales siguen una distribución normal.
+Para los *modelos 2* y *4* $p-value < \alpha = 0.05$ entonces rechazamos $H_0$, por lo que la prueba de Shapiro-Wilks nos dice que nuestros datos no siguen una distribución normal. Pero para los *modelos 1, 3* y *5* $p-value > \alpha = 0.05$ entonces aceptamos $H_0$, por lo que la prueba de Shapiro-Wilks nos dice que nuestros residuales siguen una distribución normal.
 
 $$\textbf{Test de  Jarque-Bera}$$
 $$H_0: \text{La distribución es normal} \quad \text{vs}\quad H_a:\text{La distribución no es normal}$$
@@ -337,10 +352,12 @@ jarque.bera.test(fit2_data$residuals)
 jarque.bera.test(fit3_data$residuals)
 #Modelo 4
 jarque.bera.test(fit4_data$residuals)
+#Modelo 5
+jarque.bera.test(fit5_data$residuals)
 ```
-Notemos que para los *modelos 1, 2* y *4* el $p-value < \alpha = 0.05$ entonces rechazamos $H_0$, por lo que la prueba de Jarque-Bera nos dice que nuestros residuales no siguen una distribución normal. Pero para el *modelo 3* el $p-value > \alpha = 0.05$ entonces aceptamos $H_0$, por lo que la prueba de Jarque-Bera nos dice que nuestros residuales siguen una distribución normal.
+Notemos que para los *modelos 1, 2* y *4* el $p-value < \alpha = 0.05$ entonces rechazamos $H_0$, por lo que la prueba de Jarque-Bera nos dice que nuestros residuales no siguen una distribución normal. Pero para el *modelo 3* y *5* el $p-value > \alpha = 0.05$ entonces aceptamos $H_0$, por lo que la prueba de Jarque-Bera nos dice que nuestros residuales siguen una distribución normal.
 
-El único modelo que paso todas las pruebas de normalidad fue el *3*. Ahora veamos los demás supuestos.
+Los modelos que pasaron todas las pruebas de normalidad fueron el *3* y *5*. Ahora veamos los demás supuestos.
 
 ## Varianza constante
 
@@ -366,6 +383,10 @@ bptest(Y3 ~ X3)
 Y4 <- as.numeric(fit4_data$residuals)
 X4 <- 1:length(fit4_data$residuals)
 bptest(Y4 ~ X4)
+#Modelo 5
+Y5 <- as.numeric(fit5_data$residuals)
+X5 <- 1:length(fit5_data$residuals)
+bptest(Y5 ~ X5)
 ```
 Notemos que para todos nuestros modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba de Breusch-Pagan nos dice que nuestros residuales tienen varianza constante.
 
@@ -382,6 +403,8 @@ t.test(fit2_data$residuals,mu=0)
 t.test(fit3_data$residuals,mu=0)
 #Modelo 4
 t.test(fit4_data$residuals,mu=0)
+#Modelo 5
+t.test(fit5_data$residuals,mu=0)
 ```
 Observemos que para todos nuestros modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba T-cuadrada de Hotelling nos dice que tenemos media cero.
 
@@ -398,9 +421,11 @@ ggtsdisplay(fit2_data$residuals,main="Residuales Modelo 2")
 ggtsdisplay(fit3_data$residuals,main="Residuales Modelo 3")
 #Modelo 4
 ggtsdisplay(fit4_data$residuals,main="Residuales Modelo 4")
+#Modelo 5
+ggtsdisplay(fit5_data$residuals,main="Residuales Modelo 5")
 ```
 
-Para el *modelo 1* y *2* notemos que en $lag=4$ ligeramente se sale nuestro dato del intervalo de confianza por lo que aplicaremos la prueba de Box-Pierce en dicho lag. Para el *modelo 3* aplicaremos la misma prueba pero en $lag=8$ y para el *modelo 4* en $lag=5$.
+Para el *modelo 1* y *2* notemos que en $lag=4$ ligeramente se sale nuestro dato del intervalo de confianza por lo que aplicaremos la prueba de Box-Pierce en dicho lag. Para el *modelo 3* aplicaremos la misma prueba pero en $lag=8$ y para los *modelo 4* y *5* en $lag=5$.
 
 $$\textbf{Test de Box-Pierce}$$
 $$H_0: \text{Independencia} \quad \text{vs}\quad H_a: \text{Dependencia}$$
@@ -413,6 +438,8 @@ Box.test(fit2_data$residuals, lag = 4)
 Box.test(fit3_data$residuals, lag = 8)
 #Modelo 4
 Box.test(fit4_data$residuals, lag = 5)
+#Modelo 5
+Box.test(fit5_data$residuals, lag = 5)
 ```
 Notemos que para todos los modelos el $p-value > \alpha = 0.05$, entonces aceptamos $H_0$, por lo que la prueba de Box-Pierce nos dice que tenemos independencia en los residuales de todos nuestros modelos.
 
@@ -428,18 +455,42 @@ tsdiag(fit2_data)
 tsdiag(fit3_data)
 #Modelo 4
 tsdiag(fit4_data)
+#Modelo 5
+tsdiag(fit5_data)
 ```
 Notemos que para todos nuestros modelos los $lags$ se encuentra por encima de nuestra $\alpha = 0.05$ por lo que aceptamos la hipótesis nula, es decir si tenemos independencia en todos los modelos.
-Por lo que tenemos:
+
+Ahora calculemos los intervalos de confianza para ver si los parámetros son significativos.
+
+```{r}
+#Modelo 1
+confint(fit1_data)
+#Modelo 2
+confint(fit2_data)
+#Modelo 3
+confint(fit3_data)
+#Modelo 4
+confint(fit4_data)
+#Modelo 5
+confint(fit5_data)
+```
+Para los *modelos 1, 3* y *4* no tenemos al cero en nuestros intervalos de confianza, es decir todos los parámetros son significativos. Pero para los *modelos 2* y *5* si tenemos al cero en los intervalos por lo que tenemos parámetros no significativos.
+
+Resumiendo tenemos los siguientes resultados para la verificación de supuestos:
 
 Table: Análisis de los residuales
 
 |          |**Normalidad**|**Varianza constante**|**Media cero**|**Independencia**|
 |----------|--------------|----------------------|--------------|-----------------|
 |*Modelo 1*|   $\times$   |      $\checkmark$    | $\checkmark$ |   $\checkmark$  | 
-|*Modelo 2*| $\checkmark$ |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
-|*Modelo 3*|   $\times$   |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
+|*Modelo 2*|   $\times$   |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
+|*Modelo 3*|$\checkmark$  |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
 |*Modelo 4*|   $\times$   |     $\checkmark$     | $\checkmark$ |   $\checkmark$  | 
+|*Modelo 5*| $\checkmark$ |     $\checkmark$     | $\checkmark$ |   $\checkmark$  |
+
+Podemos ver que el *modelo 3* pasa todos los supuestos, sin embargo tiene los peores valores para el *MAE*, *RMSE*, *AIC* y *BIC*. Por otro lado, el *modelo 5* tambien pasa todos los supuestos pero tenemos parámetros NO significativos, pues en el intervalo de confianza *sar1* tenemos al cero. El *modelo 2* tambien contiene parámetros NO significativos y su *AIC* y *BIC* no son tan bueno. 
+
+Ahora, comparando el *modelo 1* y el *modelo 4*, podemos ver que el primero tiene mejores valores para *AIC*, *ME*, *MAE* y *RMSE* que el cuarto modelo. Por lo tanto nos quedamos con el **modelo 1**.
 
 
 
