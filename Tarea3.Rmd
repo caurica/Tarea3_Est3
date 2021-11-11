@@ -493,5 +493,43 @@ Podemos ver que el *modelo 3* pasa todos los supuestos, sin embargo tiene los pe
 Ahora, comparando el *modelo 1* y el *modelo 4*, podemos ver que el primero tiene mejores valores para *AIC*, *ME*, *MAE* y *RMSE* que el cuarto modelo. Por lo tanto nos quedamos con el **modelo 1**.
 
 
+## Inciso 4:
+
+Ya que hemos determinado que (1,2,1)(0,1,1)[4] se ajusta adecuadamente, seguiramos trabajando con éste
+
+
+```{r}
+
+
+fit1 <- arima(data2, order=c(1,2,1), seasonal=list(order=c(0,1,1), period=4))
+#hacemos 2 diferenciaciones manualmente para obtener estacionaridad
+
+fit1
+```
+
+
+Ahora hacemos las predicciones para los siguientes 2 años:
+
+
+```{r}
+
+### Predict
+
+pred <- predict(fit1, n.ahead=8)$pred
+pred
+pred= pred^2
+pred1 <- predict(fit1, n.ahead = 24)
+tl <- pred1$pred - 1.96 * pred1$se
+tu <- pred1$pred + 1.96 * pred1$se
+tl <- (tl)^2
+tu <- (tu)^2
+
+plot(forecast(ts_12, 4))
+ts.plot(ts_12_2, xlim= c(1964, 1979), ylim=c(9,50), main= "predicción")
+points(pred, type="l", col= 3)
+points(tl, type= "l", col= "red")
+points(tu, type= "l", col= "red")
+```
+
 
 
